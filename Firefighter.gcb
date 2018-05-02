@@ -5,14 +5,14 @@
 '===LCD CONFIG===
 #define LCD_IO 4
 #define LCD_NO_RW
-#define LCD_RS PORTB.6
-#define LCD_Enable PORTB.7
-#define LCD_DB4 PORTB.2
-#define LCD_DB5 PORTB.3
-#define LCD_DB6 PORTB.4
-#define LCD_DB7 PORTB.5
+#define LCD_RS PORTA.2
+#define LCD_Enable PORTA.3
+#define LCD_DB4 PORTA.4
+#define LCD_DB5 PORTA.5
+#define LCD_DB6 PORTA.6
+#define LCD_DB7 PORTA.7
 
-#define PWM_FREQ 16
+#define PWM_FREQ 16 'kHz
 
 '===I/O CONFIG===
 DIR PORTA OUT
@@ -22,34 +22,46 @@ DIR PORTC.2 OUT
 DIR PORTD OUT
 
 
+Cls
+
+
 ' Startup LED sequence
 REPEAT 3
+  Print "."
   SET PORTA.0 ON
   SET PORTA.1 OFF
-  WAIT 250 ms
+  WAIT 500 ms
   SET PORTA.0 OFF
   SET PORTA.1 ON
-  WAIT 250 ms
+  WAIT 500 ms
 END REPEAT
 
+Cls
 
 'SET PORTC.1 ON
 'SET PORTC.2 ON
 
-HPWM 1, PWM_FREQ, 200
-HPWM 2, PWM_FREQ, 200
-
-PORTD = 0b01010101
-
-
 DO FOREVER
+  Print "1"
+  PORTD = 0b00000010
+  MotorsPulse1000
+  Print "2"
+  PORTD = 0b00001000
+  MotorsPulse1000
+  Print "3"
+  PORTD = 0b00100000
+  MotorsPulse1000
+  Print "4"
+  PORTD = 0b10000000
+  MotorsPulse1000
+LOOP
+
+SUB MotorsPulse1000
   HPWM 1, PWM_FREQ, 200
   HPWM 2, PWM_FREQ, 200
+
   WAIT 1000 ms
 
   HPWM 1, PWM_FREQ, 0
   HPWM 2, PWM_FREQ, 0
-  WAIT 2000 ms
-
-  PORTD = !PORTD
-LOOP
+END SUB
