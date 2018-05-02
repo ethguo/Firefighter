@@ -2,6 +2,13 @@
 
 #config MCLRE = ON
 
+#define LINE_IN PORTB.0
+#define WALL1_IN PORTE.0
+#define WALL2_IN PORTE.1
+#define FLAME_IN PORTE.2
+
+#define FAN_OUT PORTC.0
+
 '===LCD CONFIG===
 #define LCD_IO 4
 #define LCD_NO_RW
@@ -16,14 +23,13 @@
 
 '===I/O CONFIG===
 DIR PORTA OUT
-DIR PORTC.0 IN
+DIR PORTC.0 OUT
 DIR PORTC.1 OUT
 DIR PORTC.2 OUT
 DIR PORTD OUT
 
 
 Cls
-
 
 ' Startup LED sequence
 REPEAT 3
@@ -42,17 +48,21 @@ Cls
 'SET PORTC.2 ON
 
 DO FOREVER
-  Print "1"
-  PORTD = 0b00000010
+  Cls
+  Print "Fwd"
+  PORTD = 0b10101010
   MotorsPulse1000
-  Print "2"
-  PORTD = 0b00001000
+  Cls
+  Print "Left"
+  PORTD = 0b10100101
   MotorsPulse1000
-  Print "3"
-  PORTD = 0b00100000
+  Cls
+  Print "Back"
+  PORTD = 0b01010101
   MotorsPulse1000
-  Print "4"
-  PORTD = 0b10000000
+  Cls
+  Print "Right"
+  PORTD = 0b01011010
   MotorsPulse1000
 LOOP
 
@@ -64,4 +74,6 @@ SUB MotorsPulse1000
 
   HPWM 1, PWM_FREQ, 0
   HPWM 2, PWM_FREQ, 0
+
+  WAIT 500 ms
 END SUB
