@@ -28,6 +28,11 @@ DIR PORTC.1 OUT
 DIR PORTC.2 OUT
 DIR PORTD OUT
 
+DIR LINE_IN IN
+DIR WALL1_IN IN
+DIR WALL2_IN IN
+DIR FLAME_IN IN
+
 
 Cls
 
@@ -49,31 +54,6 @@ Cls
 
 DO FOREVER
   Cls
-  Print "Fwd"
-  PORTD = 0b10101010
-  MotorsPulse1000
-  Cls
-  Print "Left"
-  PORTD = 0b10100101
-  MotorsPulse1000
-  Cls
-  Print "Back"
-  PORTD = 0b01010101
-  MotorsPulse1000
-  Cls
-  Print "Right"
-  PORTD = 0b01011010
-  MotorsPulse1000
+  Print LINE_IN
+  Wait 100 ms
 LOOP
-
-SUB MotorsPulse1000
-  HPWM 1, PWM_FREQ, 200
-  HPWM 2, PWM_FREQ, 200
-
-  WAIT 1000 ms
-
-  HPWM 1, PWM_FREQ, 0
-  HPWM 2, PWM_FREQ, 0
-
-  WAIT 500 ms
-END SUB
