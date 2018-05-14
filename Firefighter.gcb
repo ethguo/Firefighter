@@ -53,6 +53,10 @@ END REPEAT
 
 Cls
 
+
+HPWM 1, PWM_FREQ, 200
+HPWM 2, PWM_FREQ, 200
+
 'SET PORTC.1 ON
 'SET PORTC.2 ON
 
@@ -62,7 +66,7 @@ DO FOREVER
     ReadWall2
     ReadFlame
     IF (clock & 0b00001111) = 0 THEN DisplaySensors
-
+    Room1
     Wait 4 ms
   NEXT
 LOOP
@@ -107,4 +111,8 @@ SUB PadNumber(num)
   IF num < 10 THEN
     Print " "
   END IF
+END SUB
+
+SUB Room1
+  PORTD = 0b10100000
 END SUB
