@@ -2,12 +2,18 @@
 
 #config MCLRE = ON
 
+#define PWM_FREQ 16 'kHz
+
+'===I/O PINS===
 #define LINE_IN PORTB.0
 #define WALL1_IN PORTE.0
 #define WALL2_IN PORTE.1
 #define FLAME_IN PORTE.2
 
 #define FAN_OUT PORTC.0
+
+#define LED0 PORTA.0
+#define LED1 PORTA.1
 
 '===LCD CONFIG===
 #define LCD_IO 4
@@ -18,8 +24,6 @@
 #define LCD_DB5 PORTA.5
 #define LCD_DB6 PORTA.6
 #define LCD_DB7 PORTA.7
-
-#define PWM_FREQ 16 'kHz
 
 '===I/O CONFIG===
 DIR PORTA OUT
@@ -39,12 +43,12 @@ Cls
 ' Startup LED sequence
 REPEAT 3
   Print "."
-  SET PORTA.0 ON
-  SET PORTA.1 OFF
-  WAIT 500 ms
-  SET PORTA.0 OFF
-  SET PORTA.1 ON
-  WAIT 500 ms
+  SET LED0 ON
+  SET LED1 OFF
+  WAIT 333 ms
+  SET LED0 OFF
+  SET LED1 ON
+  WAIT 333 ms
 END REPEAT
 
 Cls
@@ -53,7 +57,54 @@ Cls
 'SET PORTC.2 ON
 
 DO FOREVER
-  Cls
-  Print LINE_IN
-  Wait 100 ms
+  FOR clock = 0 to 255
+    ReadWall1
+    ReadWall2
+    ReadFlame
+    IF (clock & 0b00001111) = 0 THEN DisplaySensors
+
+    Wait 4 ms
+  NEXT
 LOOP
+
+SUB ReadWall1
+  adval = READAD(AN5, TRUE)
+  wall1 = (6787 / (adval - 3) - 4) / 5
+END SUB
+
+SUB ReadWall2
+  adval = READAD(AN6, TRUE)
+  wall2 = (6787 / (adval - 3) - 4) / 5
+END SUB
+
+SUB ReadFlame
+  flame = READAD(AN7, TRUE)
+END SUB
+
+SUB DisplaySensors
+  LED1 = !LED1
+  Cls
+
+  Print "W1"
+  PadNumber(wall1)
+  Print wall1
+
+  Locate 0,6
+  Print "W2"
+  PadNumber(wall2)
+  Print wall2
+
+  Locate 0,12
+  Print "F"
+  PadNumber(flame)
+  Print flame
+END SUB
+
+SUB PadNumber(num)
+  IF num < 100 THEN
+    Print " "
+  END IF
+  IF num < 10 THEN
+    Print " "
+  END IF
+END SUB
