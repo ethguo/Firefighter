@@ -10,10 +10,19 @@
 #define WALL2_IN PORTE.1
 #define FLAME_IN PORTE.2
 
-#define FAN_OUT PORTC.0
-
 #define LED0 PORTA.0
 #define LED1 PORTA.1
+
+#define FAN PORTC.0
+
+#define M1B PORTD.0
+#define M1F PORTD.1
+#define M2B PORTD.2
+#define M2F PORTD.3
+#define M3B PORTD.4
+#define M3F PORTD.5
+#define M4B PORTD.6
+#define M4F PORTD.7
 
 '===LCD CONFIG===
 #define LCD_IO 4
@@ -37,6 +46,10 @@ DIR WALL1_IN IN
 DIR WALL2_IN IN
 DIR FLAME_IN IN
 
+
+DIM Mode AS WORD
+
+Mode = @Travel1
 
 Cls
 
@@ -66,7 +79,7 @@ DO FOREVER
     ReadWall2
     ReadFlame
     IF (clock & 0b00001111) = 0 THEN DisplaySensors
-    Room1
+    IndCall Mode
     Wait 4 ms
   NEXT
 LOOP
@@ -113,14 +126,16 @@ SUB PadNumber(num)
   END IF
 END SUB
 
-SUB Room1
+
+SUB Travel1
   PORTD = 0
-  IF wall2 > 16 THEN
-    PORTD.7 = 1
-    PORTD.5 = 1
+  IF wall1 > 12 THEN
+    M1F = 1
+    M2F = 1
   END IF
-  IF wall2 < 20 THEN
-    PORTD.3 = 1
-    PORTD.1 = 1
+  IF wall1 < 16 THEN
+    M3B = 1
+    M4B = 1
   END IF
+
 END SUB
