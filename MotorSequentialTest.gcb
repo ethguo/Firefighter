@@ -1,0 +1,74 @@
+#chip 16f887, 8
+
+#config MCLRE = ON
+
+'===LCD CONFIG===
+#define LCD_IO 4
+#define LCD_NO_RW
+#define LCD_RS PORTA.2
+#define LCD_Enable PORTA.3
+#define LCD_DB4 PORTA.4
+#define LCD_DB5 PORTA.5
+#define LCD_DB6 PORTA.6
+#define LCD_DB7 PORTA.7
+
+#define PWM_FREQ 16 'kHz
+
+'===I/O CONFIG===
+DIR PORTA OUT
+DIR PORTC.0 IN
+DIR PORTC.1 OUT
+DIR PORTC.2 OUT
+DIR PORTD OUT
+
+
+Cls
+
+
+' Startup LED sequence
+Print "Motor Sequential"
+Locate 1,0
+Print "Test"
+REPEAT 3
+  Print "."
+  SET PORTA.0 ON
+  SET PORTA.1 OFF
+  WAIT 500 ms
+  SET PORTA.0 OFF
+  SET PORTA.1 ON
+  WAIT 500 ms
+END REPEAT
+
+Cls
+
+'SET PORTC.1 ON
+'SET PORTC.2 ON
+
+DO FOREVER
+  Print "1"
+  PORTD = 0b00000010
+  MotorsPulse1000
+  Cls
+  Print "2"
+  PORTD = 0b00001000
+  MotorsPulse1000
+  Cls
+  Print "3"
+  PORTD = 0b00100000
+  MotorsPulse1000
+  Cls
+  Print "4"
+  PORTD = 0b10000000
+  MotorsPulse1000
+  Cls
+LOOP
+
+SUB MotorsPulse1000
+  HPWM 1, PWM_FREQ, 200
+  HPWM 2, PWM_FREQ, 200
+
+  WAIT 1000 ms
+
+  HPWM 1, PWM_FREQ, 0
+  HPWM 2, PWM_FREQ, 0
+END SUB
