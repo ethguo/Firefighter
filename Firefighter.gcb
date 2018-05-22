@@ -47,9 +47,13 @@ DIR WALL2_IN IN
 DIR FLAME_IN IN
 
 
-DIM Mode AS WORD
+DIM clock AS BYTE
+DIM mode AS WORD
+DIM modeStr AS STRING
 
-Mode = @Travel1
+clock = 0
+mode = @Travel1
+modeStr = "Init"
 
 Cls
 
@@ -66,23 +70,26 @@ END REPEAT
 
 Cls
 
-
-HPWM 1, PWM_FREQ, 160
-HPWM 2, PWM_FREQ, 160
+SetSpeed(160)
 
 'SET PORTC.1 ON
 'SET PORTC.2 ON
 
 DO FOREVER
-  FOR clock = 0 to 255
-    ReadWall1
-    ReadWall2
-    ReadFlame
-    IF (clock & 0b00001111) = 0 THEN DisplaySensors
-    IndCall Mode
-    Wait 4 ms
-  NEXT
+  ReadWall1
+  ReadWall2
+  ReadFlame
+  IF (clock & 0b00001111) = 0 THEN DisplaySensors
+  IndCall mode
+
+  clock++
+  Wait 4 ms
 LOOP
+
+SUB SetSpeed(speed)
+  HPWM 1, PWM_FREQ, speed
+  HPWM 2, PWM_FREQ, speed
+END SUB
 
 SUB ReadWall1
   adval = READAD(AN5, TRUE)
@@ -115,6 +122,9 @@ SUB DisplaySensors
   Print "F"
   PadNumber(flame)
   Print flame
+
+  Locate 1,0
+  Print modeStr
 END SUB
 
 SUB PadNumber(num)
@@ -126,16 +136,29 @@ SUB PadNumber(num)
   END IF
 END SUB
 
-
 SUB Travel1
+  modeStr = "Travel1"
   PORTD = 0
-  IF wall1 > 12 THEN
-    M1F = 1
-    M2F = 1
+  IF wall1 > 60 THEN
+    PORTD = 0b00001010
+    WAIT 700 ms
+    mode = Travel1_b
+    EXIT SUB
   END IF
-  IF wall1 < 16 THEN
-    M3B = 1
-    M4B = 1
+  IF wall1 > 10 THEN
+    M1B = 1
+    M2B = 1
   END IF
+  IF wall1 < 14 THEN
+    M3F = 1
+    M4F = 1
+  END IF
+END SUB
 
+SUB Travel1_b
+  modeStr = "Travel1_b"
+  PORTD = 0b10100000
+  IF wall1 < 50 THEN
+    mode = Room1
+  END IF
 END SUB
