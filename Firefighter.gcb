@@ -2,6 +2,14 @@
 
 #config MCLRE = ON
 
+#define FULL_SPEED 200
+#define DURATION_PER_DEG 6 'ms
+
+#define DRIVE_FWD 0b10101010
+#define DRIVE_BACK 0b01010101
+#define DRIVE_LEFT 0b10100101
+#define DRIVE_RIGHT 0b01011010
+
 #define PWM_FREQ 16 'kHz
 
 '===I/O PINS===
@@ -47,13 +55,19 @@ DIR WALL2_IN IN
 DIR FLAME_IN IN
 
 
-DIM clock AS BYTE
+DIM displayClock AS BYTE
+DIM runTimer AS BIT
+DIM timer AS WORD
 DIM mode AS WORD
 DIM modeStr AS STRING
+DIM duration AS WORD
 
-clock = 0
+displayClock = 0
+runTimer = TRUE
+timer = 0
 mode = @Travel1
 modeStr = "Init"
+duration = 0
 
 Cls
 
@@ -70,7 +84,7 @@ END REPEAT
 
 Cls
 
-SetSpeed(160)
+SetSpeed(FULL_SPEED)
 
 'SET PORTC.1 ON
 'SET PORTC.2 ON
@@ -79,16 +93,43 @@ DO FOREVER
   ReadWall1
   ReadWall2
   ReadFlame
-  IF (clock & 0b00001111) = 0 THEN DisplaySensors
+  IF (displayClock & 0b00001111) = 0 THEN DisplaySensors
   IndCall mode
 
-  clock++
+  displayClock++
+  IF runTimer THEN timer++
   Wait 4 ms
 LOOP
 
-SUB SetSpeed(speed)
+SUB SetSpeed12(speed)
   HPWM 1, PWM_FREQ, speed
+END SUB
+
+SUB SetSpeed34(speed)
   HPWM 2, PWM_FREQ, speed
+END SUB
+
+SUB SetSpeed(speed)
+  SetSpeed12(speed)
+  SetSpeed34(speed)
+END SUB
+
+SUB PivotLeft(degrees)
+  SetSpeed(160)
+  PORTD = 0b10010110
+  duration = degrees * DURATION_PER_DEG
+  WAIT duration ms
+  SetSpeed(FULL_SPEED)
+  PORTD = 0
+END SUB
+
+SUB PivotRight(degrees)
+  SetSpeed(160)
+  PORTD = 0b01101001
+  duration = degrees * DURATION_PER_DEG
+  WAIT duration ms
+  SetSpeed(FULL_SPEED)
+  PORTD = 0
 END SUB
 
 SUB ReadWall1
@@ -125,6 +166,9 @@ SUB DisplaySensors
 
   Locate 1,0
   Print modeStr
+
+  Locate 1,12
+  Print duration
 END SUB
 
 SUB PadNumber(num)
@@ -138,27 +182,70 @@ END SUB
 
 SUB Travel1
   modeStr = "Travel1"
-  PORTD = 0
-  IF wall1 > 60 THEN
-    PORTD = 0b00001010
-    WAIT 700 ms
-    mode = Travel1_b
+
+  IF wall2 > 40 THEN
+    runTimer = TRUE
+  ELSE
+    runTimer = FALSE
+    timer = 0
+  END IF
+
+  IF timer > 20 & wall2 > 30 THEN
+    PivotRight(20)
+
+    mode = @Room1
     EXIT SUB
   END IF
-  IF wall1 > 10 THEN
-    M1B = 1
-    M2B = 1
+
+  SetSpeed(FULL_SPEED)
+  PORTD = DRIVE_BACK
+
+  IF wall2 > 11 THEN
+    SetSpeed12(96)
   END IF
-  IF wall1 < 14 THEN
-    M3F = 1
-    M4F = 1
+  IF wall2 < 10 THEN
+    SetSpeed34(96)
   END IF
 END SUB
 
-SUB Travel1_b
-  modeStr = "Travel1_b"
-  PORTD = 0b10100000
-  IF wall1 < 50 THEN
-    mode = Room1
+SUB Room1
+  modeStr = "Room1"
+
+  IF flame < 20 THEN
+    mode = @Flame1
+    EXIT SUB
   END IF
+
+  IF wall2 < 15 THEN
+    timer = 0
+    runTimer = TRUE
+
+    PivotLeft(90)
+
+    mode = @Travel2
+    EXIT SUB
+  END IF
+
+  SetSpeed(FULL_SPEED)
+  PORTD = DRIVE_RIGHT
+END SUB
+
+SUB Flame1
+  modeStr = "Flame1"
+  FAN = ON
+
+  SetSpeed(FULL_SPEED)
+  PORTD = DRIVE_FWD
+
+  IF wall1 > 11 THEN
+    SetSpeed12(96)
+  END IF
+  IF wall1 < 10 THEN
+    SetSpeed34(96)
+  END IF
+END SUB
+
+SUB Travel2
+  modeStr = "Travel2"
+  PORTD = DRIVE_LEFT
 END SUB
