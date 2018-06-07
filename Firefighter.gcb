@@ -206,10 +206,10 @@ SUB Travel1
   SetSpeed(FULL_SPEED)
   PORTD = DRIVE_BACK
 
-  IF wall2 > 11 THEN
+  IF wall2 > 10 THEN
     SetSpeed12(QUARTER_SPEED)
   END IF
-  IF wall2 < 10 THEN
+  IF wall2 < 9 THEN
     SetSpeed34(QUARTER_SPEED)
   END IF
 END SUB
@@ -284,5 +284,17 @@ END SUB
 SUB Travel3
   modeStr = "Travel3"
 
-  PORTD = 0
+  SetSpeed(NORMAL_SPEED)
+  PORTD = DRIVE_RIGHT
+
+  IF wall2 < 10 THEN mode = @Travel3_b
+END SUB
+
+SUB Travel3_b
+  modeStr = "Travel3_b"
+
+  SetSpeed(NORMAL_SPEED)
+  PORTD = DRIVE_FWD
+
+  IF wall1 > 40 THEN mode = @Room3
 END SUB
