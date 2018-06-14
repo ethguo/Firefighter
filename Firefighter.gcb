@@ -2,21 +2,26 @@
 
 #config MCLRE = ON
 
-#define FULL_SPEED 255
-#define NORMAL_SPEED 200
-#define HALF_SPEED 150
-#define QUARTER_SPEED 96
-#define PIVOT_SPEED 160
-#define DURATION_PER_DEG 6 ' ms
-#define DURATION_ROOM2_SCAN 67 '*4 ms
-#define FLAME_THRESHOLD 16
-
-#define DRIVE_FWD 0b10101010
-#define DRIVE_BACK 0b01010101
-#define DRIVE_LEFT 0b10100101
-#define DRIVE_RIGHT 0b01011010
-
 #define PWM_FREQ 16 'kHz
+
+'===CONFIGURATION===
+#define FULL_SPEED   255
+#define NORMAL_SPEED 200
+#define HALF_SPEED   144
+#define QUARTER_SPEED 96
+#define PIVOT_SPEED  160
+
+#define DURATION_PER_DEG 6 ' ms
+#define DURATION_SCAN4 50 '*4 ms
+#define FLAME_THRESHOLD 16
+#define FLAME_THRESHOLD_2 5
+
+#define DRIVE_FWD   0b10101010
+#define DRIVE_BACK  0b01010101
+#define DRIVE_LEFT  0b10100101
+#define DRIVE_RIGHT 0b01011010
+#define PIVOT_LEFT  0b10010110
+#define PIVOT_RIGHT 0b01101001
 
 '===I/O PINS===
 #define LINE_IN PORTB.0
@@ -66,14 +71,16 @@ DIM runTimer AS BIT
 DIM timer AS WORD
 DIM mode AS WORD
 DIM modeStr AS STRING
-DIM duration AS WORD
+DIM pivotDuration AS WORD
+DIM isFlame4 AS BIT
 
 displayClock = 0
 runTimer = TRUE
 timer = 0
 mode = @Travel1
 modeStr = "Init"
-duration = 0
+pivotDuration = 0
+isFlame4 = FALSE
 
 Cls
 
@@ -122,18 +129,18 @@ END SUB
 
 SUB PivotLeft(degrees)
   SetSpeed(PIVOT_SPEED)
-  PORTD = 0b10010110
-  duration = degrees * DURATION_PER_DEG
-  WAIT duration ms
+  PORTD = PIVOT_LEFT
+  pivotDuration = degrees * DURATION_PER_DEG
+  WAIT pivotDuration ms
   SetSpeed(NORMAL_SPEED)
   PORTD = 0
 END SUB
 
 SUB PivotRight(degrees)
   SetSpeed(PIVOT_SPEED)
-  PORTD = 0b01101001
-  duration = degrees * DURATION_PER_DEG
-  WAIT duration ms
+  PORTD = PIVOT_RIGHT
+  pivotDuration = degrees * DURATION_PER_DEG
+  WAIT pivotDuration ms
   SetSpeed(NORMAL_SPEED)
   PORTD = 0
 END SUB
@@ -157,33 +164,39 @@ SUB DisplaySensors
   Cls
 
   Print "W1"
-  PadNumber(wall1)
+  PadByte(wall1)
   Print wall1
 
   Locate 0,6
   Print "W2"
-  PadNumber(wall2)
+  PadByte(wall2)
   Print wall2
 
   Locate 0,12
   Print "F"
-  PadNumber(flame)
+  PadByte(flame)
   Print flame
 
   Locate 1,0
   Print modeStr
 
-  Locate 1,12
-  Print duration
+  Locate 1,11
+  PadWord(timer)
+  Print timer
+
+  LED0 = isFlame4
 END SUB
 
-SUB PadNumber(num)
-  IF num < 100 THEN
-    Print " "
-  END IF
-  IF num < 10 THEN
-    Print " "
-  END IF
+SUB PadByte(num)
+  IF num < 100 THEN Print " "
+  IF num < 10 THEN Print " "
+END SUB
+
+SUB PadWord(num)
+  IF num < 10000 THEN Print " "
+  IF num < 1000 THEN Print " "
+  IF num < 100 THEN Print " "
+  IF num < 10 THEN Print " "
 END SUB
 
 SUB Travel1
@@ -197,9 +210,13 @@ SUB Travel1
   END IF
 
   IF timer > 8 & wall2 > 30 THEN
-    runTimer = FALSE
+    runTimer = TRUE
+    timer = 0
 
-    mode = @Room1
+    PORTD = 0
+    WAIT 50 ms
+
+    mode = @Scan4
     EXIT SUB
   END IF
 
@@ -214,24 +231,62 @@ SUB Travel1
   END IF
 END SUB
 
+SUB Scan4
+  modeStr = "Scan4"
+  SetSpeed(PIVOT_SPEED)
+  PORTD = PIVOT_LEFT
+
+  IF flame < FLAME_THRESHOLD THEN isFlame4 = TRUE
+
+  IF timer > 40 THEN
+    runTimer = TRUE
+    timer = 0
+
+    PORTD = 0
+    WAIT 50 ms
+
+    mode = @Scan4_b
+  END IF
+END SUB
+
+SUB Scan4_b
+  modeStr = "Scan4_b"
+  SetSpeed(PIVOT_SPEED)
+  PORTD = PIVOT_RIGHT
+
+  IF flame < FLAME_THRESHOLD THEN isFlame4 = TRUE
+
+  IF timer > 53 THEN
+    runTimer = TRUE
+    timer = 0
+
+    PORTD = 0
+    WAIT 50 ms
+
+    mode = @Room1
+  END IF
+END SUB
+
 SUB Room1
   modeStr = "Room1"
-
-  IF wall2 < 20 THEN
-    PivotLeft(85)
-
-    mode = @Room2
-    EXIT SUB
-  END IF
 
   SetSpeed(NORMAL_SPEED)
   PORTD = DRIVE_RIGHT
 
-  IF flame < FLAME_THRESHOLD THEN
-    WAIT 50 ms
+  IF timer > 50 THEN
+    runTimer = FALSE
 
-    mode = @Flame1
-    EXIT SUB
+    IF wall2 < 20 THEN
+      PivotLeft(75)
+
+      mode = @Room2
+    END IF
+
+    IF flame < FLAME_THRESHOLD THEN
+      WAIT 50 ms
+
+      mode = @Flame1
+    END IF
   END IF
 END SUB
 
@@ -258,8 +313,11 @@ SUB Room2
   PORTD = DRIVE_LEFT
 
   IF LINE_IN = 0 THEN
-    IF flame < FLAME_THRESHOLD THEN mode = @Flame2
-    ELSE mode = @Travel3
+    IF flame < FLAME_THRESHOLD THEN
+      mode = @Flame2
+    ELSE
+      mode = @Travel3
+    END IF
   END IF
 END SUB
 
@@ -287,7 +345,12 @@ SUB Travel3
   SetSpeed(NORMAL_SPEED)
   PORTD = DRIVE_RIGHT
 
-  IF wall2 < 10 THEN mode = @Travel3_b
+  IF wall2 < 20 THEN
+    SetSpeed(NORMAL_SPEED)
+    PORTD = DRIVE_FWD
+    WAIT 1000 ms
+    mode = @Travel3_b
+  END IF
 END SUB
 
 SUB Travel3_b
@@ -296,5 +359,90 @@ SUB Travel3_b
   SetSpeed(NORMAL_SPEED)
   PORTD = DRIVE_FWD
 
-  IF wall1 > 40 THEN mode = @Room3
+  IF wall1 > 40 THEN
+    IF isFlame4 THEN
+      SetSpeed(NORMAL_SPEED)
+      PORTD = 0b01010000 ' Diagonally back right
+      WAIT 200 ms
+      mode = @Travel4
+    ELSE
+      mode = @Room3
+    END IF
+  END IF
+END SUB
+
+SUB Room3
+  modeStr = "Room3"
+
+  SetSpeed(NORMAL_SPEED)
+  PORTD = DRIVE_LEFT
+
+  IF wall1 < 20 THEN
+    IF flame < FLAME_THRESHOLD THEN
+      mode = @Flame3
+
+    ELSE
+      mode = @Travel4
+    END IF
+  END IF
+END SUB
+
+SUB Flame3
+  modeStr = "Flame3"
+  FAN = ON
+
+  SetSpeed(HALF_SPEED)
+  PORTD = DRIVE_FWD
+
+  IF LINE_IN = 0 THEN mode = @Flame3_b
+END SUB
+
+SUB Flame3_b
+  modeStr = "Flame3_b"
+  FAN = ON
+
+  IF flame < FLAME_THRESHOLD_2 THEN
+    PORTD = 0
+  ELSE
+    SetSpeed(QUARTER_SPEED)
+    PORTD = PIVOT_RIGHT
+  END IF
+END SUB
+
+SUB Travel4
+  modeStr = "Travel4"
+
+  SetSpeed(FULL_SPEED)
+  PORTD = DRIVE_RIGHT
+
+  IF flame < FLAME_THRESHOLD THEN
+    WAIT 275 ms
+
+    PivotRight(85)
+
+    mode = @Room4
+  END IF
+END SUB
+
+SUB Room4
+  modeStr = "Room4"
+  SetSpeed(NORMAL_SPEED)
+  PORTD = DRIVE_LEFT
+
+  IF LINE_IN = 0 THEN
+    mode = @Flame4
+  END IF
+END SUB
+
+SUB Flame4
+  modeStr = "Flame4"
+  FAN = ON
+
+  IF flame < FLAME_THRESHOLD_2 THEN
+    SetSpeed(104)
+    PORTD = DRIVE_FWD
+  ELSE
+    SetSpeed(QUARTER_SPEED)
+    PORTD = PIVOT_RIGHT
+  END IF
 END SUB
