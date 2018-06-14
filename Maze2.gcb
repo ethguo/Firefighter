@@ -1,0 +1,369 @@
+#chip 16f887, 8
+
+#config MCLRE = ON
+
+#define PWM_FREQ 16 'kHz
+
+'===CONFIGURATION===
+#define FULL_SPEED    255
+#define NORMAL_SPEED  200
+#define HALF_SPEED    144
+#define QUARTER_SPEED 112
+#define PIVOT_SPEED   160
+
+#define DURATION_PER_DEG 7 'ms
+#define FLAME_THRESHOLD 16
+#define FLAME_THRESHOLD_2 5
+
+#define DRIVE_FWD   0b10101010
+#define DRIVE_BACK  0b01010101
+#define DRIVE_LEFT  0b10100101
+#define DRIVE_RIGHT 0b01011010
+#define PIVOT_LEFT  0b10010110
+#define PIVOT_RIGHT 0b01101001
+#define BRAKE       0b11111111
+
+'===I/O PINS===
+#define FAN PORTC.0
+#define MOTORS PORTD
+
+#define LINE_IN PORTB.0
+#define WALL1_IN PORTE.0
+#define WALL2_IN PORTE.1
+#define FLAME_IN PORTE.2
+
+#define DEBUG_IN PORTC.3
+
+#define LED0 PORTA.0
+#define LED1 PORTA.1
+
+'===LCD CONFIG===
+#define LCD_IO 4
+#define LCD_NO_RW
+#define LCD_RS PORTA.2
+#define LCD_Enable PORTA.3
+#define LCD_DB4 PORTA.4
+#define LCD_DB5 PORTA.5
+#define LCD_DB6 PORTA.6
+#define LCD_DB7 PORTA.7
+
+'===I/O CONFIG===
+DIR PORTA OUT
+DIR PORTC.0 OUT
+DIR PORTC.1 OUT
+DIR PORTC.2 OUT
+DIR PORTD OUT
+
+DIR LINE_IN IN
+DIR WALL1_IN IN
+DIR WALL2_IN IN
+DIR FLAME_IN IN
+
+
+DIM displayClock AS BYTE
+DIM runTimer AS BIT
+DIM timer AS WORD
+DIM pivotDuration AS WORD
+DIM mode AS WORD
+DIM modeStr AS STRING
+
+displayClock = 0
+runTimer = FALSE
+timer = 0
+mode = @Travel1
+modeStr = "Init"
+pivotDuration = 0
+
+Cls
+
+' Startup LED sequence
+REPEAT 3
+  Print "."
+  SET LED0 ON
+  SET LED1 OFF
+  WAIT 333 ms
+  SET LED0 OFF
+  SET LED1 ON
+  WAIT 333 ms
+END REPEAT
+
+Cls
+
+DO FOREVER
+  ReadWall1
+  ReadWall2
+  ReadFlame
+  IF (displayClock & 0x0F) = 0 THEN DisplaySensors
+  IndCall mode
+
+  displayClock++
+  IF runTimer THEN timer++
+  Wait 4 ms
+LOOP
+
+SUB ReadWall1
+  adval = READAD(AN5, TRUE)
+  wall1 = (6787 / (adval - 3) - 4) / 5
+END SUB
+
+SUB ReadWall2
+  adval = READAD(AN6, TRUE)
+  wall2 = (6787 / (adval - 3) - 4) / 5
+END SUB
+
+SUB ReadFlame
+  flame = READAD(AN7, TRUE)
+END SUB
+
+SUB DisplaySensors
+  LED1 = !LED1
+  Cls
+
+  Print "W1"
+  PadByte(wall1)
+  Print wall1
+
+  Locate 0,6
+  Print "W2"
+  PadByte(wall2)
+  Print wall2
+
+  Locate 0,12
+  Print "F"
+  PadByte(flame)
+  Print flame
+
+  Locate 1,0
+  Print modeStr
+
+  Locate 1,9
+  Print LINE_IN
+
+  Locate 1,11
+  PadWord(timer)
+  Print timer
+
+END SUB
+
+SUB PadByte(num)
+  IF num < 100 THEN Print " "
+  IF num < 10 THEN Print " "
+END SUB
+
+SUB PadWord(num)
+  IF num < 10000 THEN Print " "
+  IF num < 1000 THEN Print " "
+  IF num < 100 THEN Print " "
+  IF num < 10 THEN Print " "
+END SUB
+
+SUB SetSpeed12(speed)
+  HPWM 1, PWM_FREQ, speed
+END SUB
+
+SUB SetSpeed34(speed)
+  HPWM 2, PWM_FREQ, speed
+END SUB
+
+SUB SetSpeed(speed)
+  SetSpeed12(speed)
+  SetSpeed34(speed)
+END SUB
+
+SUB PivotLeft(degrees)
+  SetSpeed(PIVOT_SPEED)
+  MOTORS = PIVOT_LEFT
+  pivotDuration = degrees * DURATION_PER_DEG
+  WAIT pivotDuration ms
+  SetSpeed(NORMAL_SPEED)
+  MOTORS = BRAKE
+END SUB
+
+SUB PivotRight(degrees)
+  SetSpeed(PIVOT_SPEED)
+  MOTORS = PIVOT_RIGHT
+  pivotDuration = degrees * DURATION_PER_DEG
+  WAIT pivotDuration ms
+  SetSpeed(NORMAL_SPEED)
+  MOTORS = BRAKE
+END SUB
+
+'===MODES===
+
+SUB Travel1
+  modeStr = "Trav1"
+
+  SetSpeed(FULL_SPEED)
+  MOTORS = DRIVE_BACK
+
+  IF wall2 > 10 THEN SetSpeed12(QUARTER_SPEED)
+  IF wall2 < 9 THEN SetSpeed34(QUARTER_SPEED)
+
+  IF wall1 < 40 THEN
+    runTimer = TRUE
+    timer = 0
+
+    mode = @Travel1_b
+  END IF
+END SUB
+
+SUB Travel1_b
+  modeStr = "Trav1_b"
+
+  SetSpeed(FULL_SPEED)
+  MOTORS = DRIVE_BACK
+
+  IF wall2 > 10 THEN SetSpeed12(QUARTER_SPEED)
+  IF wall2 < 9 THEN SetSpeed34(QUARTER_SPEED)
+
+  IF timer > 50 THEN
+    runTimer = FALSE
+
+    IF wall1 > 40 THEN mode = @Scan1
+  END IF
+END SUB
+
+SUB Scan1
+  modeStr = "Scan1"
+
+  SetSpeed(FULL_SPEED)
+  MOTORS = DRIVE_LEFT
+
+  IF flame < FLAME_THRESHOLD THEN mode = @Flame1
+
+  IF LINE_IN = 0 THEN
+    PivotRight(90)
+
+    runTimer = TRUE
+    timer = 0
+
+    mode = @Travel2
+  END IF
+END SUB
+
+SUB Flame1
+  modeStr = "Flame1"
+
+  FAN = ON
+
+  SetSpeed(QUARTER_SPEED)
+  MOTORS = 0b10000010
+
+  IF flame < FLAME_THRESHOLD_2 THEN mode = @Flame1_b
+END SUB
+
+SUB Flame1_b
+  modeStr = "Flame1_b"
+
+  FAN = ON
+
+  SetSpeed(HALF_SPEED)
+  MOTORS = DRIVE_FWD
+END SUB
+
+SUB Travel2
+  modeStr = "Trav2"
+
+  SetSpeed(FULL_SPEED)
+  MOTORS = DRIVE_BACK
+
+  IF wall2 > 10 THEN SetSpeed12(QUARTER_SPEED)
+  IF wall2 < 9 THEN SetSpeed34(QUARTER_SPEED)
+
+  IF timer > 50 THEN
+    runTimer = FALSE
+
+    IF wall1 < 40 THEN
+      runTimer = TRUE
+      timer = 0
+
+      mode = @Travel2_b
+    END IF
+  END IF
+END SUB
+
+SUB Travel2_b
+  modeStr = "Trav2_b"
+
+  SetSpeed(FULL_SPEED)
+  MOTORS = DRIVE_BACK
+
+  IF wall2 > 10 THEN SetSpeed12(QUARTER_SPEED)
+  IF wall2 < 9 THEN SetSpeed34(QUARTER_SPEED)
+
+  IF timer > 50 THEN
+    runTimer = FALSE
+
+    IF wall1 > 40 THEN mode = @Scan2
+  END IF
+END SUB
+
+SUB Scan2
+  modeStr = "Scan2"
+
+  SetSpeed(FULL_SPEED)
+  MOTORS = DRIVE_LEFT
+
+  IF flame < FLAME_THRESHOLD THEN mode = @Flame2
+
+  IF wall1 < 20 THEN mode = @Travel3
+END SUB
+
+SUB Flame2
+  modeStr = "Flame2"
+
+  FAN = ON
+
+  SetSpeed(QUARTER_SPEED)
+  MOTORS = 0b00101000
+
+  IF flame < FLAME_THRESHOLD_2 THEN mode = @Flame2_b
+END SUB
+
+SUB Flame2_b
+  modeStr = "Flame2_b"
+
+  FAN = ON
+
+  SetSpeed(HALF_SPEED)
+  MOTORS = DRIVE_FWD
+END SUB
+
+SUB Travel3
+  modeStr = "Trav3"
+
+  SetSpeed(FULL_SPEED)
+  MOTORS = DRIVE_FWD
+
+  IF wall1 > 40 THEN
+    PivotLeft(180)
+
+    mode = @Scan3
+  END IF
+END SUB
+
+SUB Scan3
+  modeStr = "Scan3"
+
+  SetSpeed(FULL_SPEED)
+  MOTORS = DRIVE_RIGHT
+
+  IF flame < FLAME_THRESHOLD THEN mode = @Flame3
+END SUB
+
+SUB Flame3
+  modeStr = "Flame3"
+
+  FAN = ON
+
+  SetSpeed(QUARTER_SPEED)
+  MOTORS = 0b00101000
+
+  IF flame < FLAME_THRESHOLD_2 THEN mode = @Flame3_b
+END SUB
+
+SUB Flame3_b
+  modeStr = "Flame3_b"
+  FAN = ON
+  MOTORS = BRAKE
+END SUB
