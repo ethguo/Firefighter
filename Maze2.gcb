@@ -11,7 +11,7 @@
 #define QUARTER_SPEED 112
 #define PIVOT_SPEED   160
 
-#define DURATION_PER_DEG 7 'ms
+#define DURATION_PER_DEG 6 'ms
 #define FLAME_THRESHOLD 16
 #define FLAME_THRESHOLD_2 5
 
@@ -232,7 +232,7 @@ SUB Scan1
   IF flame < FLAME_THRESHOLD THEN mode = @Flame1
 
   IF LINE_IN = 0 THEN
-    PivotRight(90)
+    PivotRight(85)
 
     runTimer = TRUE
     timer = 0
@@ -245,7 +245,6 @@ SUB Flame1
   modeStr = "Flame1"
 
   FAN = ON
-
   SetSpeed(QUARTER_SPEED)
   MOTORS = 0b10000010
 
@@ -256,7 +255,6 @@ SUB Flame1_b
   modeStr = "Flame1_b"
 
   FAN = ON
-
   SetSpeed(HALF_SPEED)
   MOTORS = DRIVE_FWD
 END SUB
@@ -294,7 +292,12 @@ SUB Travel2_b
   IF timer > 50 THEN
     runTimer = FALSE
 
-    IF wall1 > 40 THEN mode = @Scan2
+    IF wall1 > 40 THEN
+      runTimer = TRUE
+      timer = 0
+
+      mode = @Scan2
+    END IF
   END IF
 END SUB
 
@@ -304,16 +307,20 @@ SUB Scan2
   SetSpeed(FULL_SPEED)
   MOTORS = DRIVE_LEFT
 
+
   IF flame < FLAME_THRESHOLD THEN mode = @Flame2
 
-  IF wall1 < 20 THEN mode = @Travel3
+  IF timer > 100 THEN
+    runTimer = FALSE
+
+    IF wall1 < 20 THEN mode = @Travel3
+  END IF
 END SUB
 
 SUB Flame2
   modeStr = "Flame2"
 
   FAN = ON
-
   SetSpeed(QUARTER_SPEED)
   MOTORS = 0b00101000
 
@@ -324,7 +331,6 @@ SUB Flame2_b
   modeStr = "Flame2_b"
 
   FAN = ON
-
   SetSpeed(HALF_SPEED)
   MOTORS = DRIVE_FWD
 END SUB
@@ -336,7 +342,7 @@ SUB Travel3
   MOTORS = DRIVE_FWD
 
   IF wall1 > 40 THEN
-    PivotLeft(180)
+    PivotLeft(150)
 
     mode = @Scan3
   END IF
@@ -348,22 +354,23 @@ SUB Scan3
   SetSpeed(FULL_SPEED)
   MOTORS = DRIVE_RIGHT
 
-  IF flame < FLAME_THRESHOLD THEN mode = @Flame3
+  IF wall2 < 22 & flame < FLAME_THRESHOLD THEN mode = @Flame3
 END SUB
 
 SUB Flame3
   modeStr = "Flame3"
 
   FAN = ON
-
   SetSpeed(QUARTER_SPEED)
-  MOTORS = 0b00101000
+  MOTORS = 0b10000010
 
   IF flame < FLAME_THRESHOLD_2 THEN mode = @Flame3_b
 END SUB
 
 SUB Flame3_b
   modeStr = "Flame3_b"
+
   FAN = ON
-  MOTORS = BRAKE
+  SetSpeed(HALF_SPEED)
+  MOTORS = DRIVE_FWD
 END SUB
